@@ -22,7 +22,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          brew install meson ninja lld
+          brew install meson ninja lld libarchive
           echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
           sudo gem install xcodeproj
 
