@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-26             # Apple Silicon runner (the guest build needs arm64 macOS)
+    runs-on: macos-26            # Apple Silicon runner (the guest build needs arm64 macOS)
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +22,7 @@ jobs:
 
       - name: Install build tools
         run: |
+          # libarchive is needed for tools/fakefsify (meson silently skips it otherwise)
           brew install meson ninja lld libarchive
           echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
           sudo gem install xcodeproj
@@ -31,6 +32,16 @@ jobs:
         with:
           path: build/root.tar.gz
           key: rootfs-${{ hashFiles('scripts/build-rootfs.sh', 'rootfs/**') }}
+
+      - name: Fix hostname overflow in emulator uname() (CI hostnames are > 64 chars)
+        run: |
+          sed -i '' 's/strcpy(uts->hostname, hostname);/strncpy(uts->hostname, hostname, sizeof(uts->hostname) - 1);/' ish-arm64/kernel/uname.c
+          grep -n 'uts->hostname' ish-arm64/kernel/uname.c
+          # also give the runner a short hostname, belt and braces
+          sudo scutil --set HostName dsh-ci
+          sudo scutil --set LocalHostName dsh-ci
+          sudo scutil --set ComputerName dsh-ci
+          uname -n
 
       - name: Build emulator + guest image
         run: |
