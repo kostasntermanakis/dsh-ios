@@ -1,0 +1,47 @@
+name: Build Unsigned DSH IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          brew install meson ninja lld
+          echo "/opt/homebrew/opt/lld/bin" >> $GITHUB_PATH
+          gem install xcodeproj
+
+      - name: Build iSH-ARM64 emulator and rootfs
+        run: make emulator
+
+      - name: Compile unsigned DSH.app
+        run: |
+          xcodebuild \
+            -project DSH.xcodeproj \
+            -target DSH \
+            -configuration Release \
+            -sdk iphoneos \
+            CONFIGURATION_BUILD_DIR="$PWD/out" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R out/DSH.app Payload/
+          zip -qry DSH-unsigned.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DSH-unsigned-ipa
+          path: DSH-unsigned.ipa
